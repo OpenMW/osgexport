@@ -1857,16 +1857,8 @@ class BlenderAnimationToAnimation(object):
                             need_bake = True
 
         if need_bake:
-            self.action = osgbake.bake(self.config.scene,
-                                       self.object,
-                                       self.config.scene.frame_start,
-                                       self.config.scene.frame_end,
-                                       self.config.bake_frame_step,
-                                       False,  # only_selected
-                                       True,   # do_pose
-                                       True,   # do_object
-                                       False,  # do_constraint_clear
-                                       False)  # to_quat
+            self.action = osgbake.bakeAnimation(self.config.scene, self.object)
+            self.action_name = self.action.name
 
     def createAnimation(self, target=None):
         osglog.log("Exporting animation on object {}".format(self.object))
