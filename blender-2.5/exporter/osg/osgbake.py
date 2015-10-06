@@ -29,6 +29,7 @@ def bakeAction(frame_start,
                do_pose=True,
                do_object=True,
                do_visual_keying=True,
+               use_quaternions=False,
                do_constraint_clear=False,
                do_parents_clear=False,
                do_clean=False,
@@ -142,6 +143,11 @@ def bakeAction(frame_start,
             if only_selected and not pbone.bone.select:
                 continue
 
+            # Quaternions are forced for bones
+            rotation_mode_backup = pbone.rotation_mode
+            if pbone.rotation_mode != 'QUATERNION':
+                pbone.rotation_mode = 'QUATERNION'
+
             if do_constraint_clear:
                 while pbone.constraints:
                     pbone.constraints.remove(pbone.constraints[0])
@@ -172,8 +178,16 @@ def bakeAction(frame_start,
 
                 pbone.keyframe_insert("scale", -1, f, name, options)
 
+            # restore rotation mode
+            pbone.rotation_mode = rotation_mode_backup
+
     # object. TODO. multiple objects
     if do_object:
+
+        rotation_mode_backup = obj.rotation_mode
+        if use_quaternions and obj.rotation_mode != 'QUATERNION':
+            obj.rotation_mode = 'QUATERNION'
+
         if do_constraint_clear:
             while obj.constraints:
                 obj.constraints.remove(obj.constraints[0])
@@ -205,6 +219,9 @@ def bakeAction(frame_start,
 
             obj.keyframe_insert("scale", -1, f, name, options)
 
+        # restore rotation mode
+        obj.rotation_mode = rotation_mode_backup
+
         if do_parents_clear:
             obj.parent = None
 
@@ -230,8 +247,7 @@ def bakeAction(frame_start,
     return action
 
 
-# take care of restoring selection after
-def bakeAnimation(scene, blender_object):
+def bakeAnimation(scene, blender_object, use_quaternions=False):
     # baking will replace the current action but we want to keep scene unchanged
     if blender_object.animation_data and blender_object.animation_data.action:
         original_action = blender_object.animation_data.action
@@ -247,10 +263,11 @@ def bakeAnimation(scene, blender_object):
                               do_parents_clear=False,  # don't unparent object
                               do_object=True,  # bake solid animation
                               do_pose=True,  # bake skeletal animation
+                              use_quaternions=use_quaternions,
                               # visual keying bakes in worldspace, but here we want it local since we keep parenting
                               do_visual_keying=False)
 
-    # restore original action
+    # restore original action and rotation_mode
     if original_action:
         blender_object.animation_data.action = original_action
 
