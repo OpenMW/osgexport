@@ -487,10 +487,11 @@ class Export(object):
         return anims
 
     def createAnimationsObjectAndSetCallback(self, osg_object, blender_object):
+        rotation_mode = 'QUATERNION' if self.config.use_quaternions else blender_object.rotation_mode
         return createAnimationsGenericObject(osg_object, blender_object, self.config,
                                              createAnimationUpdate(blender_object,
                                                                    UpdateMatrixTransform(name=osg_object.name),
-                                                                   blender_object.rotation_mode),
+                                                                   rotation_mode),
                                              self.unique_objects)
 
     def isObjectVisible(self, obj):
@@ -1856,8 +1857,8 @@ class BlenderAnimationToAnimation(object):
                         if kf.interpolation != 'LINEAR':
                             need_bake = True
 
-        if need_bake:
-            self.action = osgbake.bakeAnimation(self.config.scene, self.object)
+        if self.config.bake_animations or need_bake:
+            self.action = osgbake.bakeAnimation(self.config.scene, self.object, use_quaternions=self.config.use_quaternions)
             self.action_name = self.action.name
 
     def createAnimation(self, target=None):

@@ -86,6 +86,8 @@ def main():
                         help="Enable saving of animations")
     parser.add_argument("-b", "--bake-all", dest="bake_all", action="store_true", default=False,
                         help="Force animation baking")
+    parser.add_argument("-q", "--use-quaternions", dest="use_quaternions", action="store_true", default=False,
+                        help="Use quaternions for rotation baking")
     parser.add_argument("-m", "--apply-modifiers", dest="apply_modifiers", action="store_true", default=False,
                         help="Apply modifiers before exporting")
     parser.add_argument("-j", "--json-materials", dest="json_materials", action="store_true", default=False,
@@ -102,6 +104,7 @@ def main():
         config.initFilePaths(args.save_path)
         config.export_anim = args.enable_animation
         config.bake_animations = args.bake_all
+        config.use_quaternions = args.use_quaternions
         config.apply_modifiers = args.apply_modifiers
         config.scene = bpy.context.scene
         config.json_materials = args.json_materials
@@ -170,6 +173,7 @@ class OSGGUI(bpy.types.Operator, ExportHelper):
     JSON_MATERIALS = BoolProperty(name="JSON Materials", description="Export materials into JSON userdata.", default=False)
     JSON_SHADERS = BoolProperty(name="JSON shaders", description="Export shader graphs into JSON userdata.", default=False)
     BAKE_ALL = BoolProperty(name="Bake all animations", description="Force baking for all animations", default=True)
+    USE_QUATERNIONS = BoolProperty(name="Use quaternions", description="Bake rotations using quaternions", default=True)
     BAKE_CONSTRAINTS = BoolProperty(name="Bake Constraints", description="Bake constraints into actions", default=True)
     BAKE_FRAME_STEP = IntProperty(name="Bake frame step", description="Frame step when baking actions", default=1, min=1, max=30)
     OSGCONV_TO_IVE = BoolProperty(name="Convert to IVE (uses osgconv)", description="Use osgconv to convert to IVE", default=False)
@@ -193,6 +197,7 @@ class OSGGUI(bpy.types.Operator, ExportHelper):
         layout.row(align=True).prop(self, "EXPORT_ALL_SCENES")
         layout.row(align=True).prop(self, "APPLYMODIFIERS")
         layout.row(align=True).prop(self, "BAKE_ALL")
+        layout.row(align=True).prop(self, "USE_QUATERNIONS")
         layout.row(align=True).prop(self, "BAKE_CONSTRAINTS")
         layout.row(align=True).prop(self, "LOG")
         layout.row(align=True).prop(self, "JSON_MATERIALS")
@@ -236,6 +241,7 @@ class OSGGUI(bpy.types.Operator, ExportHelper):
         self.ZERO_TRANSLATIONS = self.config.zero_translations
         self.LOG = self.config.log
         self.BAKE_ALL = self.config.bake_animations
+        self.USE_QUATERNIONS = self.config.use_quaternions
         self.BAKE_CONSTRAINTS = self.config.bake_constraints
         self.BAKE_FRAME_STEP = self.config.bake_frame_step
         self.OSGCONV_TO_IVE = self.config.osgconv_to_ive
