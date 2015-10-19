@@ -43,7 +43,6 @@ Matrix = mathutils.Matrix
 Vector = mathutils.Vector
 Quaternion = mathutils.Quaternion
 
-
 def createImageFilename(texturePath, image):
     fn = bpy.path.basename(bpy.path.display_name_from_filepath(image.filepath))
 
@@ -250,11 +249,15 @@ def make_dupliverts_real(scene):
 #             return o
 #     return None
 
+def hasConstraints(blender_object):
+    return blender_object.constraints and len(blender_object.constraints) > 0
+
 
 def createAnimationUpdate(obj, callback, rotation_mode, prefix="", zero=False):
     has_location_keys = False
     has_scale_keys = False
     has_rotation_keys = False
+    has_constraints = hasConstraints(obj)
 
     if obj.animation_data:
         action = obj.animation_data.action
@@ -272,7 +275,7 @@ def createAnimationUpdate(obj, callback, rotation_mode, prefix="", zero=False):
                 if datapath == "scale":
                     has_scale_keys = True
 
-    if not (has_location_keys or has_scale_keys or has_rotation_keys) and (len(obj.constraints) == 0):
+    if not (has_location_keys or has_scale_keys or has_rotation_keys or has_constraints):
         return None
 
     if zero:
@@ -340,15 +343,20 @@ def createAnimationUpdate(obj, callback, rotation_mode, prefix="", zero=False):
 
 
 def createAnimationsGenericObject(osg_object, blender_object, config, update_callback, unique_objects):
-    if (config.export_anim is False) or (update_callback is None) or (blender_object.animation_data is None):
+    if (config.export_anim is False) or (update_callback is None):
         return None
 
-    if unique_objects.hasAnimation(blender_object.animation_data.action):
+    has_action = blender_object.animation_data and blender_object.animation_data.action
+    has_constraints = hasConstraints(blender_object)
+
+    if has_action and unique_objects.hasAnimation(blender_object.animation_data.action):
         return None
 
     action2animation = BlenderAnimationToAnimation(object=blender_object,
                                                    config=config,
-                                                   unique_objects=unique_objects)
+                                                   unique_objects=unique_objects,
+                                                   has_action=has_action,
+                                                   has_constraints=has_constraints)
     anim = action2animation.createAnimation()
     if len(anim) > 0:
         osg_object.update_callbacks.append(update_callback)
@@ -514,6 +522,9 @@ class Export(object):
         # are not visible as they can be used as modifiers (avoiding some crashs during the export)
         is_visible = self.isObjectVisible(obj)
         osglog.log("")
+
+        has_action = obj.animation_data and obj.animation_data.action
+        has_constraints = obj.constraints and len(obj.constraints) > 0
 
         anims = []
         item = None
@@ -1858,14 +1869,17 @@ class BlenderAnimationToAnimation(object):
         self.animations = None
         self.action = None
         self.action_name = None
+        self.has_action = kwargs.get('has_action', False)
+        self.has_constraints = kwargs.get('has_constraints', False)
 
     def handleAnimationBaking(self):
         need_bake = False
-        if hasattr(self.object, "constraints") and (len(self.object.constraints) > 0) and self.config.bake_constraints:
+        if self.has_constraints and self.config.bake_constraints:
             osglog.log("Baking constraints " + str(self.object.constraints))
             need_bake = True
         else:
-            if hasattr(self.object, "animation_data") and hasattr(self.object.animation_data, "action"):
+            # What if has contraints but also actions ?
+            if self.has_action:
                 self.action = self.object.animation_data.action
                 for fcu in self.action.fcurves:
                     for kf in fcu.keyframe_points:
@@ -1873,14 +1887,12 @@ class BlenderAnimationToAnimation(object):
                             need_bake = True
 
         if self.config.bake_animations or need_bake:
-            self.action = osgbake.bakeAnimation(self.config.scene, self.object, use_quaternions=self.config.use_quaternions)
+            self.action = osgbake.bakeAnimation(self.config.scene, self.object, use_quaternions=self.config.use_quaternions , has_action=self.has_action, has_constraints=self.has_constraints)
             self.action_name = self.action.name
 
     def createAnimation(self, target=None):
         osglog.log("Exporting animation on object {}".format(self.object))
-        if hasattr(self.object, "animation_data") and \
-           hasattr(self.object.animation_data, "action") and \
-           self.object.animation_data.action is not None:
+        if self.has_action:
             self.action_name = self.object.animation_data.action.name
 
         self.handleAnimationBaking()
@@ -1950,7 +1962,7 @@ def getChannel(target, action, fps, data_path, array_indexes):
 
     for time in times:
         realtime = (time) / fps
-        osglog.log("time {} {} {}".format(time, realtime, fps))
+        #osglog.log("time {} {} {}".format(time, realtime, fps))
 
         # realtime = time
         if realtime > duration:

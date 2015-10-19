@@ -91,6 +91,7 @@ def bakeAction(frame_start,
                 return matrix.copy()
     else:
         def objFrameInfo(obj, do_visual_keying):
+            # Note: Matrix basis is the transform before aplying parenting and constraints
             return obj.matrix_local.copy() if do_visual_keying else obj.matrix_basis.copy()
 
     # -------------------------------------------------------------------------
@@ -157,7 +158,6 @@ def bakeAction(frame_start,
 
             for (f, matrix) in zip(frame_range, pose_info):
                 pbone.matrix_basis = matrix[name].copy()
-
                 pbone.keyframe_insert("location", -1, f, name, options)
 
                 rotation_mode = pbone.rotation_mode
@@ -197,8 +197,11 @@ def bakeAction(frame_start,
 
         for (f, matrix) in zip(frame_range, obj_info):
             name = "Action Bake"  # XXX: placeholder
-            obj.matrix_basis = matrix
-
+            if do_visual_keying and not do_parents_clear:
+                obj.matrix_basis.identity()
+                obj.matrix_local = matrix  # basis is before parenting, so need to set local since keep parented
+            else:
+                obj.matrix_basis = matrix
             obj.keyframe_insert("location", -1, f, name, options)
 
             rotation_mode = obj.rotation_mode
@@ -247,10 +250,12 @@ def bakeAction(frame_start,
     return action
 
 
-def bakeAnimation(scene, blender_object, use_quaternions=False):
+def bakeAnimation(scene, blender_object, use_quaternions=False, has_action=False, has_constraints=False):
     # baking will replace the current action but we want to keep scene unchanged
-    if blender_object.animation_data and blender_object.animation_data.action:
+    if has_action:
         original_action = blender_object.animation_data.action
+    # Need visual keying for constrained object with no actions
+    visual_keying = has_constraints
 
     # Baking is done on the active object
     active_object_backup = scene.objects.active
@@ -259,16 +264,16 @@ def bakeAnimation(scene, blender_object, use_quaternions=False):
                               scene.frame_end,
                               scene.frame_step,
                               do_clean=True,  # clean keyframes
-                              do_constraint_clear=False,  # remove constraints from object
+                              do_constraint_clear=True,  # remove constraints from object
                               do_parents_clear=False,  # don't unparent object
                               do_object=True,  # bake solid animation
                               do_pose=True,  # bake skeletal animation
                               use_quaternions=use_quaternions,
                               # visual keying bakes in worldspace, but here we want it local since we keep parenting
-                              do_visual_keying=False)
+                              do_visual_keying=visual_keying)
 
     # restore original action and rotation_mode
-    if original_action:
+    if has_action:
         blender_object.animation_data.action = original_action
 
     scene.objects.active = active_object_backup
