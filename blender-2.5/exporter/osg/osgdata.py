@@ -482,7 +482,7 @@ class Export(object):
 
         if self.unique_objects.hasAnimation(blender_object.animation_data.action):
             return None
-
+        update_callback = createAnimationUpdate(blender_object, UpdateMatrixTransform(name=osg_object.name), blender_object.rotation_mode)
         osglog.log("animation_data is {} {}".format(blender_object.name, blender_object.animation_data))
 
         action2animation = BlenderAnimationToAnimation(object=blender_object,
@@ -491,6 +491,9 @@ class Export(object):
         osglog.log("animations created for object '{}'".format(blender_object.name))
 
         anims = action2animation.createAnimation()
+        if len(anims) > 0 and update_callback:
+            osg_object.update_callbacks = []
+            osg_object.update_callbacks.append(update_callback)
         return anims
 
     def createAnimationsObjectAndSetCallback(self, osg_object, blender_object):
@@ -1900,6 +1903,8 @@ class BlenderAnimationToAnimation(object):
                 bname = bone.name
                 osglog.log("{} processing channels for bone {}".format(name, bname))
                 self.appendChannelsToAnimation(bname, animation, action, prefix=('pose.bones["{}"].'.format(bname)))
+            # Append channels for armature solid animation
+            self.appendChannelsToAnimation(self.object.name, animation, action)
         else:
             self.appendChannelsToAnimation(target, animation, action)
         return animation
