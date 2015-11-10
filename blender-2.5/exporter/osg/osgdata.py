@@ -261,14 +261,16 @@ class Export(object):
     def isObjectVisible(self, blender_object):
         return blender_object.is_visible(self.config.scene) or not self.config.only_visible
 
-    def createAnimationsObject(self, osg_object, blender_object, config, update_callback, unique_objects, parse_all_actions):
+    def createAnimationsObject(self, osg_object, blender_object, config, update_callback,
+                               unique_objects, parse_all_actions=False):
+
         if not config.export_anim:
             return None
 
         if blender_object.type != 'ARMATURE' and not update_callback:
             return None
 
-        has_action = hasAction(blender_object)
+        has_action = blender_object.animation_data and hasAction(blender_object)
         has_constraints = hasConstraints(blender_object)
 
         if not has_action or unique_objects.hasAnimation(blender_object.animation_data.action):
