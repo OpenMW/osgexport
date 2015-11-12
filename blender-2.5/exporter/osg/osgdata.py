@@ -147,16 +147,19 @@ class UniqueObject(object):
         self.objects = {}
         self.anims = {}
 
-    def hasAnimation(self, obj):
-        return obj in self.anims
+    def hasAnimation(self, action):
+        return any([action in self.anims[key] for key in self.anims])
 
-    def getAnimation(self, obj):
-        if self.hasAnimation(obj):
-            return self.anims[obj]
-        return None
+    def getAnimation(self, action):
+        for anim in self.anims:
+            if action in self.anims[anim]:
+                return action
 
-    def registerAnimation(self, obj, reg):
-        self.anims[obj] = reg
+    def registerAnimation(self, animation, action):
+        if animation not in self.anims:
+            self.anims[animation] = []
+
+        self.anims[animation].append(action)
 
     def hasObject(self, obj):
         return obj in self.objects
@@ -202,6 +205,7 @@ class Export(object):
             self.config.defaultattr('scene', bpy.context.scene)
         self.rest_armatures = []
         self.animations = []
+        self.current_animation = None
         self.images = set()
         self.lights = {}
         self.root = None
@@ -279,7 +283,14 @@ class Export(object):
         if parse_all_actions:
             anims = action2animation.parseAllActions()
         else:
-            anims.append(action2animation.createAnimation(blender_object.name))
+            # must have only one animation here
+            if not self.current_animation:
+                self.current_animation = Animation()
+                self.current_animation.setName('Take 01')
+
+            action2animation.createAnimation()
+            action2animation.addActionDataToAnimation(self.current_animation)
+            anims.append(self.current_animation)
 
         if len(anims) > 0 and update_callback:
             if blender_object.type == 'ARMATURE':
@@ -395,7 +406,7 @@ class Export(object):
             self.unique_objects.registerObject(blender_object, osg_object)
 
         if anims is not None:
-            self.animations += [a for a in anims if a is not None]
+            self.animations.extend(anims)
 
         if osg_root is None:
             osg_root = osg_object
@@ -1733,6 +1744,13 @@ class BlenderAnimationToAnimation(object):
         self.action_name = None
         self.has_action = kwargs.get("has_action", False)
         self.has_constraints = kwargs.get("has_constraints", False)
+        if self.object:
+            self.target = self.object.name
+        else:
+            self.target = ' target'
+
+        if self.has_action:
+            self.action_name = self.object.animation_data.action.name
 
     def needBake(self, blender_object):
         if self.has_constraints and self.config.bake_constraints:
@@ -1753,12 +1771,12 @@ class BlenderAnimationToAnimation(object):
         for action in bpy.data.actions:
             self.object.animation_data.action = action
             self.action = action
-            anims.append(self.createAnimation(self.object.name))
+            anims.append(self.createAnimation())
         # Restore original action
         self.object.animation_data.action = action_backup
         return anims
 
-    def createAnimation(self, target=None):
+    def createAnimation(self):
         Log("Exporting animation on object {}".format(self.object.name))
         if self.has_action:
             self.action_name = self.object.animation_data.action.name
@@ -1770,25 +1788,36 @@ class BlenderAnimationToAnimation(object):
                                                 use_quaternions=self.config.use_quaternions)
             self.action_name = self.object.animation_data.action.name if self.has_action else 'Action_baked'
 
-        if target is None:
-            target = self.object.name
-
-        anim = self.createAnimationFromAction(target, self.action_name, self.action)
-        self.unique_objects.registerAnimation(self.action, anim)
+        anim = self.createAnimationFromAction(self.action)
+        self.unique_objects.registerAnimation(anim, self.action)
         return anim
 
-    def createAnimationFromAction(self, target, name, action):
-        animation = Animation()
-        animation.setName(name)
+    def addActionDataToAnimation(self, animation):
+        print('adding data from action {} to animation {}'.format(self.action_name, animation))
         if self.object.type == "ARMATURE":
             for bone in self.object.data.bones:
                 bname = bone.name
-                Log("{} processing channels for bone {}".format(name, bname))
+                Log("{} processing channels for bone {}".format(self.action_name, bname))
+                self.appendChannelsToAnimation(bname, animation, self.action, prefix=('pose.bones["{}"].'.format(bname)))
+            # Append channels for armature solid animation
+            self.appendChannelsToAnimation(self.object.name, animation, self.action)
+        else:
+            self.appendChannelsToAnimation(self.target, animation, self.action)
+
+        return animation
+
+    def createAnimationFromAction(self, action):
+        animation = Animation()
+        animation.setName(self.action_name)
+        if self.object.type == "ARMATURE":
+            for bone in self.object.data.bones:
+                bname = bone.name
+                Log("{} processing channels for bone {}".format(self.action_name, bname))
                 self.appendChannelsToAnimation(bname, animation, action, prefix=('pose.bones["{}"].'.format(bname)))
             # Append channels for armature solid animation
             self.appendChannelsToAnimation(self.object.name, animation, action)
         else:
-            self.appendChannelsToAnimation(target, animation, action)
+            self.appendChannelsToAnimation(self.target, animation, action)
         return animation
 
     def appendChannelsToAnimation(self, target, anim, action, prefix=""):
