@@ -274,7 +274,7 @@ def bakeAnimation(scene, blender_object, has_action=False, use_quaternions=False
                               do_visual_keying=do_visual_keying)
 
     # restore original action and rotation_mode
-    if original_action:
+    if has_action:
         blender_object.animation_data.action = original_action
 
     if blender_object.type == 'ARMATURE':

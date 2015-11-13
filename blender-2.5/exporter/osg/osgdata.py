@@ -50,6 +50,7 @@ def createAnimationUpdate(blender_object, callback, rotation_mode, prefix="", ze
     has_location_keys = False
     has_scale_keys = False
     has_rotation_keys = False
+    has_constraints = hasConstraints(blender_object)
 
     if blender_object.animation_data:
         action = blender_object.animation_data.action
@@ -67,7 +68,7 @@ def createAnimationUpdate(blender_object, callback, rotation_mode, prefix="", ze
                 if datapath == "scale":
                     has_scale_keys = True
 
-    if not (has_location_keys or has_scale_keys or has_rotation_keys) and (len(blender_object.constraints) == 0):
+    if not (has_location_keys or has_scale_keys or has_rotation_keys) and not has_constraints:
         return None
 
     if zero:
@@ -273,8 +274,12 @@ class Export(object):
         has_action = blender_object.animation_data and hasAction(blender_object)
         has_constraints = hasConstraints(blender_object)
 
-        if not has_action or unique_objects.hasAnimation(blender_object.animation_data.action):
+        if not has_action and not has_constraints:
             return None
+
+        if has_action and unique_objects.hasAnimation(blender_object.animation_data.action):
+            return None
+
 
         action2animation = BlenderAnimationToAnimation(object=blender_object,
                                                        config=config,
@@ -348,7 +353,6 @@ class Export(object):
                                                 self.unique_objects,
                                                 self.parse_all_actions)
 
-            print('oioi2 ' + str(len(osg_object.update_callbacks)) + ' ' + str(blender_object.name))
             if is_visible:
                 if blender_object.type == "MESH":
                     osg_geode = self.createGeodeFromObject(blender_object)
@@ -439,7 +443,8 @@ class Export(object):
             scene = self.config.scene
             nb_animated_objects = 0
             for obj in scene.objects:
-                if hasAction(obj):
+                # FIXME not sure about the constraint check here
+                if hasAction(obj) or hasConstraints(obj):
                     nb_animated_objects += 1
 
             self.parse_all_actions = nb_animated_objects == 1
