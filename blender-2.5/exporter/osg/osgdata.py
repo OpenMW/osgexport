@@ -51,6 +51,7 @@ def createAnimationUpdate(blender_object, callback, rotation_mode, prefix="", ze
     has_scale_keys = False
     has_rotation_keys = False
     has_constraints = hasConstraints(blender_object)
+    has_nla = hasNLATracks(blender_object)
 
     if blender_object.animation_data:
         action = blender_object.animation_data.action
@@ -68,7 +69,7 @@ def createAnimationUpdate(blender_object, callback, rotation_mode, prefix="", ze
                 if datapath == "scale":
                     has_scale_keys = True
 
-    if not (has_location_keys or has_scale_keys or has_rotation_keys) and not has_constraints:
+    if not (has_location_keys or has_scale_keys or has_rotation_keys) and not has_constraints and not has_nla:
         return None
 
     if zero:
@@ -274,7 +275,7 @@ class Export(object):
         has_action = blender_object.animation_data and hasAction(blender_object)
         has_constraints = hasConstraints(blender_object)
 
-        if not has_action and not has_constraints:
+        if not has_action and not has_constraints and not hasNLATracks(blender_object):
             return None
 
         if has_action and unique_objects.hasAnimation(blender_object.animation_data.action):
@@ -444,7 +445,7 @@ class Export(object):
             nb_animated_objects = 0
             for obj in scene.objects:
                 # FIXME not sure about the constraint check here
-                if hasAction(obj) or hasConstraints(obj):
+                if hasAction(obj) or hasConstraints(obj) or hasNLATracks(obj):
                     nb_animated_objects += 1
 
             self.parse_all_actions = nb_animated_objects == 1
