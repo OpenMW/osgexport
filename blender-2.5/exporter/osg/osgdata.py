@@ -374,7 +374,7 @@ class Export(object):
                 boneInWorldSpace = blender_object.parent.matrix_world \
                     * armature.bones[blender_object.parent_bone].matrix_local
 
-                matrix = getDeltaMatrixFromMatrix(boneInWorldSpace, blender_object.matrix_world)
+                matrix = getDeltaMatrixFromMatrix(boneInWorldSpace, blender_object.matrix_basis)
                 osg_object.matrix = matrix
                 bone.children.append(osg_object)
                 armature.pose_position = original_pose_position
